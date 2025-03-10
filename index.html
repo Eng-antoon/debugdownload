@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Driver App Logs</title>
+  <!-- Bootstrap CSS for a nice, responsive design -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    body {
+      background-color: #f8f9fa;
+    }
+    .container {
+      margin-top: 50px;
+    }
+    .log-button {
+      margin: 5px 0;
+      width: 100%;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="mb-4">Driver App Logs</h1>
+    <form id="driverForm">
+      <div class="form-group">
+        <label for="driverId">Enter Driver ID:</label>
+        <input type="number" class="form-control" id="driverId" placeholder="Driver ID" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Get Logs</button>
+    </form>
+    <hr>
+    <div id="logsContainer"></div>
+  </div>
+
+  <script>
+    document.getElementById('driverForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const driverId = document.getElementById('driverId').value;
+      const token = 'eyJhbGciOiJub25lIn0.eyJpZCI6MTgsIm5hbWUiOiJUZXN0IERyaXZlciIsInBob25lX251bWJlciI6IisyMDEwMDA2Mjk5OTgiLCJwaG90byI6eyJ1cmwiOm51bGx9LCJkcml2ZXJfbGljZW5zZSI6eyJ1cmwiOm51bGx9LCJjcmVhdGVkX2F0IjoiMjAxOS0wMy0xMyAwMDoyMjozMiArMDIwMCIsInVwZGF0ZWRfYXQiOiIyMDE5LTAzLTEzIDAwOjIyOjMyICswMjAwIiwibmF0aW9uYWxfaWQiOiIxMjM0NSIsImVtYWlsIjoicHJvZEBwcm9kLmNvbSIsImdjbV9kZXZpY2VfdG9rZW4iOm51bGx9.'; // Replace with your actual token
+
+      // Construct the URL dynamically using the input driver id
+      const url = `https://app.illa.blue/api/v3/driver/driver_app_logs?filter[driver_id]=${driverId}&all_pages=true`;
+      
+      fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        const container = document.getElementById('logsContainer');
+        container.innerHTML = '';
+
+        if(data.data && data.data.length) {
+          data.data.forEach(log => {
+            // Format the created date for readability
+            const createdAt = new Date(log.attributes.createdAt).toLocaleString();
+            const logFileUrl = log.attributes.logFileUrl;
+            
+            // Create a button element for each log entry
+            const button = document.createElement('button');
+            button.className = 'btn btn-success log-button';
+            button.textContent = `Download Log - ${createdAt}`;
+            
+            // On click, open the log file URL (this will start the download)
+            button.addEventListener('click', function() {
+              window.open(logFileUrl, '_blank');
+            });
+            
+            container.appendChild(button);
+          });
+        } else {
+          container.innerHTML = '<p>No logs found for this driver.</p>';
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Error fetching logs');
+      });
+    });
+  </script>
+</body>
+</html>
