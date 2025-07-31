@@ -17,6 +17,15 @@
       width: 100%;
       text-align: left;
     }
+    .invalid-filename {
+      background-color: #dc3545 !important;
+      border-color: #dc3545 !important;
+      opacity: 0.7;
+    }
+    .invalid-filename:hover {
+      background-color: #c82333 !important;
+      border-color: #bd2130 !important;
+    }
   </style>
 </head>
 <body>
@@ -54,15 +63,93 @@
         container.innerHTML = '';
 
         if(data.data && data.data.length) {
-          data.data.forEach(log => {
-            // Format the created date for readability
-            const createdAt = new Date(log.attributes.createdAt).toLocaleString();
+          // Function to extract date from filename
+          function extractDateFromFilename(filename) {
+            if (!filename) return null;
+            // Look for pattern like: driverId_illa-log-YYYY-MM-DD.log or similar
+            const dateMatch = filename.match(/(\d{4}-\d{2}-\d{2})/);
+            return dateMatch ? dateMatch[1] : null;
+          }
+
+          // Function to parse date string into Date object for comparison
+          function parseLogDate(dateStr) {
+            return new Date(dateStr);
+          }
+
+          // Process logs to extract date info and group by date
+          const processedLogs = data.data.map(log => {
+            const filename = log.attributes.fileName;
+            const extractedDate = extractDateFromFilename(filename);
+            const createdAt = new Date(log.attributes.createdAt);
+            
+            return {
+              ...log,
+              extractedDate,
+              createdAt,
+              hasValidFilename: !!extractedDate
+            };
+          });
+
+          // Group by extracted date and keep only the latest entry for each date
+          const logsByDate = {};
+          processedLogs.forEach(log => {
+            let dateKey;
+            if (log.extractedDate) {
+              // For valid filenames, group by extracted date
+              dateKey = log.extractedDate;
+            } else {
+              // For invalid filenames, use a unique key to prevent consolidation
+              dateKey = `invalid_${log.id}`;
+            }
+            
+            if (!logsByDate[dateKey] || log.createdAt > logsByDate[dateKey].createdAt) {
+              logsByDate[dateKey] = log;
+            }
+          });
+
+          // Convert back to array and sort by date (latest first)
+          const uniqueLogs = Object.values(logsByDate).sort((a, b) => {
+            // Put invalid filenames at the end
+            if (!a.hasValidFilename && b.hasValidFilename) return 1;
+            if (a.hasValidFilename && !b.hasValidFilename) return -1;
+            if (!a.hasValidFilename && !b.hasValidFilename) {
+              return b.createdAt - a.createdAt; // Sort by creation date for invalid ones
+            }
+            
+            // Sort valid ones by extracted date (latest first)
+            const dateA = parseLogDate(a.extractedDate);
+            const dateB = parseLogDate(b.extractedDate);
+            return dateB - dateA;
+          });
+
+          // Create buttons for each unique log entry
+          uniqueLogs.forEach(log => {
             const logFileUrl = log.attributes.logFileUrl;
+            const filename = log.attributes.fileName;
+            const createdAt = new Date(log.attributes.createdAt).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            });
             
             // Create a button element for each log entry
             const button = document.createElement('button');
             button.className = 'btn btn-success log-button';
-            button.textContent = `Download Log - ${createdAt}`;
+            
+            if (log.hasValidFilename) {
+              // Format the date nicely for display
+              const displayDate = new Date(log.extractedDate).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              });
+              button.textContent = `Download Log - ${displayDate}`;
+            } else {
+              // Handle invalid filename case
+              button.className = 'btn log-button invalid-filename';
+              button.textContent = `Download Log - Invalid Filename (${filename || 'Unknown'}) - ${createdAt}`;
+              button.title = 'Warning: This file has an invalid or missing filename';
+            }
             
             // On click, open the log file URL (this will start the download)
             button.addEventListener('click', function() {
